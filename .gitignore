@@ -1,0 +1,50 @@
+.env
+*.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+
+## runtime logs and generated artifacts
+v2/logs/
+logs/
+*.log
+
+## datasets and external repos
+dataset/
+datasets/
+data/raw/
+data/external/
+DeepRare/
+rarebench_raw/
+rarebench_local/
+
+## large / local files
+*.zip
+*.tar
+*.tar.gz
+*.pkl
+*.pt
+*.bin
+
+## editor / system
+.vscode/
+.idea/
+
+# legacy v1 / old root-level implementation, not part of minimal mainline
+/agents/
+/app/
+/core/
+/eval/
+/data/
+/tests/
+/tools/
+/cli.py
+/main.py
+
+# local project notes / internal audit docs, not included in initial public release
+/docs/
