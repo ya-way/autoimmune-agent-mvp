@@ -28,27 +28,53 @@ The showcase line is for trajectory/audit demonstration.
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
+cp secret.toml.example secret.toml
 ```
 
-### Benchmark Sanity (official-aligned)
+`secret.toml` contains private keys and local-only paths. It is gitignored by default.
+If needed, you can still use environment variables; environment variables take precedence.
+You can also load a custom path with `V2_SECRET_TOML_PATH=/path/to/secret.toml`.
 
-Check runtime config:
+Fill `secret.toml` before running:
+
+- `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`
+- `ANYSEARCH_API_KEY` (optional for better web evidence quality)
+- `DEEPRARE_REPO_PATH` and `RAREBENCH_LOCAL_CSV` (required for official benchmark eval)
+
+### Repro Check (recommended before benchmark)
 
 ```bash
 python -m v2.cli --check-llm
+python -m v2.cli --check-search
+python -m v2.cli --ask "29-year-old female with malar rash, photosensitivity, arthralgia, ANA+, anti-dsDNA+. Give top-5 differential diagnoses."
 ```
 
-Run official benchmark modes (example `limit=10`):
+Expected:
+
+- `--check-llm` prints `raw_response=LLM_OK`
+- `--check-search` may return `count=0` in restricted networks, but this is non-fatal
+- `--ask` should always return answer fields and a `log_path`
+
+### Benchmark Sanity (official-aligned)
+
+Official benchmark hard constraints:
+
+- `LLM_MODEL` must be `deepseek-chat`
+- Use real data source (`local`/`hf`), not smoke
+- `DEEPRARE_REPO_PATH` must point to a valid DeepRare repo with `eval.py`
+
+Run official benchmark modes (example `limit=10`, local csv):
 
 ```bash
+export RAREBENCH_LOCAL_CSV=/absolute/path/to/rarebench_local_sample.csv
+
 python -m v2.benchmark.deeprare \
   --mode plain_llm_deeprare_official \
   --limit 10 \
   --sample-order random \
   --seed 42 \
   --data-source local \
-  --dataset-file /home/shuotong/DeepRare/dataset/rarebench_local/rarebench_local_sample.csv \
+  --dataset-file "$RAREBENCH_LOCAL_CSV" \
   --official-eval
 
 python -m v2.benchmark.deeprare \
@@ -57,7 +83,7 @@ python -m v2.benchmark.deeprare \
   --sample-order random \
   --seed 42 \
   --data-source local \
-  --dataset-file /home/shuotong/DeepRare/dataset/rarebench_local/rarebench_local_sample.csv \
+  --dataset-file "$RAREBENCH_LOCAL_CSV" \
   --official-eval
 
 python -m v2.benchmark.deeprare \
@@ -66,7 +92,7 @@ python -m v2.benchmark.deeprare \
   --sample-order random \
   --seed 42 \
   --data-source local \
-  --dataset-file /home/shuotong/DeepRare/dataset/rarebench_local/rarebench_local_sample.csv \
+  --dataset-file "$RAREBENCH_LOCAL_CSV" \
   --official-eval
 ```
 

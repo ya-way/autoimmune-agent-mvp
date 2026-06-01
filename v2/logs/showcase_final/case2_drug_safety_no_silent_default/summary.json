@@ -1,0 +1,62 @@
+{
+  "run_id": "20260601_192945_741464_ask",
+  "mode": "ask",
+  "status": "success",
+  "created_at": "2026-06-01T11:29:45.741795Z",
+  "input_summary": "Check drug safety for using high-dose glucocorticoids and cyclophosphamide in suspected lupus nephritis with infection risk.",
+  "intent": "drug_safety",
+  "routed_to": "react_agent",
+  "answer_preview": "Please specify a concrete medication name for glucocorticoids to enable drug-level safety analysis.",
+  "counts": {
+    "llm_calls": 3,
+    "tool_calls": 2,
+    "skill_calls": 1,
+    "react_steps": 2,
+    "workflow_calls": 0,
+    "errors": 0
+  },
+  "latency": {
+    "wall_time_ms": 14172.9,
+    "sum_llm_latency_ms": 8535.19,
+    "sum_tool_latency_ms": 5632.39,
+    "sum_skill_latency_ms": 5632.56,
+    "note": "sum_* fields are cumulative nested latencies and may exceed wall time.",
+    "deprecated_total_ms": 27859.56
+  },
+  "components": {
+    "llms": [
+      "react_agent.step1.plan.attempt1",
+      "react_agent.step2.plan.attempt1",
+      "router.drug_safety.extraction.llm_json"
+    ],
+    "tools": [
+      "rxnorm_normalize_drug"
+    ],
+    "skills": [
+      "medication_normalization_skill"
+    ],
+    "workflows": [],
+    "react_actions": [
+      "final_answer",
+      "medication_normalization_skill"
+    ]
+  },
+  "warnings": [],
+  "failed_components": [],
+  "metrics": {
+    "interface": "ask",
+    "intent": "drug_safety",
+    "routed_to": "react_agent",
+    "status": "success",
+    "missing_fields": [],
+    "failed_components_count": 0,
+    "react_steps": 2
+  },
+  "dataset_source": "ask_interface",
+  "artifacts": {
+    "calls_jsonl": "calls.jsonl",
+    "full_trace_json": "full_trace.json",
+    "full_trace_md": "full_trace.md",
+    "case_report": "case_report.md"
+  }
+}

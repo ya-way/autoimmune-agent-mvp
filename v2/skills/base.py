@@ -32,13 +32,6 @@ def evidence_retrieval(
         tool_status[tool_name] = "failed"
         return None
 
-    db_result = _call_with_retry(
-        "local_empty_database_search",
-        query=item.phenotype_text,
-        logger=logger,
-        caller=caller,
-    ) or {"status": "unavailable", "warnings": ["local database tool failed"]}
-
     primary_term = ""
     if item.phenotype_names:
         primary_term = item.phenotype_names[0]
@@ -74,13 +67,13 @@ def evidence_retrieval(
         )
 
     output = {
-        "database": db_result,
+        "database": {"status": "skipped"},
         "hpo": hpo_result,
         "pubmed": pubmed_result,
         "web": web_result,
         "tool_status": tool_status,
-        "warnings": warnings,
-        "evidence_summary": _build_evidence_summary(db_result, hpo_result, pubmed_result, web_result, warnings),
+        "warnings": warnings + ["local database step removed from mainline; using external tools only."],
+        "evidence_summary": _build_evidence_summary(hpo_result, pubmed_result, web_result, warnings),
     }
     latency_ms = round((perf_counter() - start) * 1000, 2)
     logger.log_skill_call(
@@ -151,13 +144,12 @@ def deeprare_answering(
 
 
 def _build_evidence_summary(
-    db_result: dict[str, Any],
     hpo_result: dict[str, Any] | None,
     pubmed_result: dict[str, Any] | None,
     web_result: dict[str, Any] | None,
     warnings: list[str],
 ) -> str:
-    parts = [f"Database status: {db_result.get('status', 'unknown')}"]
+    parts = ["Database status: skipped (no local mock database)"]
     if hpo_result:
         parts.append(f"HPO source: {hpo_result.get('source', 'unknown')} count={hpo_result.get('result_count', 0)}")
         for line in (hpo_result.get("top_result_summaries") or [])[:2]:

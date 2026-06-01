@@ -15,20 +15,13 @@ def web_search(query: str, logger: V2RunLogger, caller: str, config: V2Config | 
     start = perf_counter()
     tool_input = {"query": query, "caller": caller}
     if not cfg.anysearch_api_key:
-        if not cfg.mock_search:
-            latency_ms = round((perf_counter() - start) * 1000, 2)
-            err = "ANYSEARCH_API_KEY is required when MOCK_SEARCH=false"
-            logger.log_tool_call("web_search", tool_input, {}, latency_ms, False, err)
-            raise RuntimeError(err)
         output = {
-            "source": "mock_anysearch",
-            "results": [
-                f"Mock evidence: rare disease differential for '{query[:120]}'",
-                "Mock evidence: phenotype to disease mapping note",
-            ],
+            "source": "web_search_unavailable",
+            "results": [],
+            "warning": "ANYSEARCH_API_KEY is missing; continue without web snippets.",
         }
         latency_ms = round((perf_counter() - start) * 1000, 2)
-        logger.log_tool_call("web_search", tool_input, output, latency_ms, True, "")
+        logger.log_tool_call("web_search", tool_input, output, latency_ms, False, output["warning"])
         return output
 
     base_url = cfg.anysearch_base_url.rstrip("/")
@@ -82,15 +75,11 @@ def web_search(query: str, logger: V2RunLogger, caller: str, config: V2Config | 
         return output
     except Exception as exc:
         latency_ms = round((perf_counter() - start) * 1000, 2)
-        logger.log_tool_call("web_search", tool_input, {}, latency_ms, False, str(exc))
-        if cfg.mock_search:
-            output = {
-                "source": "mock_anysearch_fallback",
-                "results": [
-                    f"Fallback evidence for '{query[:120]}'",
-                ],
-            }
-            logger.log_tool_call("web_search", tool_input, output, latency_ms, True, "")
-            return output
         provider = "BraveSearch" if is_brave else "AnySearch"
-        raise RuntimeError(f"{provider} real call failed: {exc}") from exc
+        output = {
+            "source": "web_search_failed",
+            "results": [],
+            "warning": f"{provider} call failed: {exc}",
+        }
+        logger.log_tool_call("web_search", tool_input, output, latency_ms, False, output["warning"])
+        return output

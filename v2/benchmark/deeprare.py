@@ -45,6 +45,7 @@ LEGACY_EXPERIMENTAL_MODES = {
     "legacy_react_without_tool",
     "legacy_react_with_tool",
 }
+TOP5_EXTRACTORS = {"deterministic", "llm"}
 
 
 def _assert_official_benchmark_is_clean(mode: str, *, config: Any, data_source: str, allow_smoke: bool) -> None:
@@ -53,8 +54,6 @@ def _assert_official_benchmark_is_clean(mode: str, *, config: Any, data_source: 
     model = str(getattr(config, "llm_model", "")).strip()
     if model != "deepseek-chat":
         raise RuntimeError(f"Official benchmark requires deepseek-chat, got: {model}")
-    if bool(getattr(config, "mock_llm", False)):
-        raise RuntimeError("Official benchmark forbids mock LLM.")
     if allow_smoke:
         raise RuntimeError("Official benchmark forbids --allow-smoke.")
     if str(data_source).strip().lower() == "smoke":
@@ -459,6 +458,87 @@ def _extract_deeprare_top5_from_text(raw_answer: str) -> tuple[list[str], list[s
     return candidates[:5], normalized[:5], parse_status, warnings
 
 
+def _extract_deeprare_top5_with_llm(
+    raw_answer: str,
+    llm: LLMClient,
+    caller: str,
+) -> tuple[list[str], list[str], str, list[str]]:
+    warnings: list[str] = []
+    system_prompt = (
+        "You are a strict medical diagnosis name extractor. "
+        "Extract exactly five rare disease diagnoses from text."
+    )
+    prompt = (
+        "Extract the top 5 diagnosis names from the following answer.\n"
+        "Output ONLY a JSON array of 5 strings.\n"
+        "Do not output HPO terms, symptoms, explanations, headings, or markdown.\n\n"
+        "ANSWER:\n"
+        f"{raw_answer}\n"
+    )
+    try:
+        llm_output = llm.complete(
+            prompt=prompt,
+            caller=caller,
+            system_prompt=system_prompt,
+        )
+    except Exception as exc:
+        warnings.append(f"llm_extractor_call_failed:{exc}")
+        return [], [], "failed", warnings
+
+    raw_candidates = _try_extract_json_candidates(str(llm_output))
+    if not raw_candidates:
+        fallback_candidates, _, fallback_warnings, fallback_status, _ = _extract_prediction_candidates(
+            raw_answer=str(llm_output),
+            top_k=5,
+        )
+        warnings.append("llm_extractor_non_json_output")
+        warnings.extend(fallback_warnings)
+        normalized = [_norm(c) for c in fallback_candidates if _norm(c)]
+        return fallback_candidates[:5], normalized[:5], fallback_status, warnings
+
+    candidates: list[str] = []
+    for item in raw_candidates:
+        candidate = _extract_candidate_from_line(str(item))
+        if not candidate:
+            continue
+        if _should_reject_candidate(candidate):
+            continue
+        if not _looks_like_disease_candidate(candidate):
+            continue
+        if candidate in candidates:
+            continue
+        candidates.append(candidate)
+        if len(candidates) >= 5:
+            break
+    status = "ok" if len(candidates) >= 5 else ("partial" if len(candidates) > 0 else "failed")
+    if len(candidates) < 5:
+        warnings.append(f"llm_extractor_only_{len(candidates)}_candidates")
+    normalized = [_norm(c) for c in candidates if _norm(c)]
+    return candidates[:5], normalized[:5], status, warnings
+
+
+def _extract_official_top5(
+    raw_answer: str,
+    *,
+    extractor: str,
+    llm: LLMClient,
+    caller_prefix: str,
+) -> tuple[list[str], list[str], str, list[str]]:
+    if extractor == "deterministic":
+        return _extract_deeprare_top5_from_text(raw_answer)
+    if extractor == "llm":
+        llm_topk, llm_norm, llm_status, llm_warnings = _extract_deeprare_top5_with_llm(
+            raw_answer=raw_answer,
+            llm=llm,
+            caller=f"{caller_prefix}.top5_extractor_llm",
+        )
+        if llm_topk:
+            return llm_topk, llm_norm, llm_status, llm_warnings
+        det_topk, det_norm, det_status, det_warnings = _extract_deeprare_top5_from_text(raw_answer)
+        return det_topk, det_norm, det_status, llm_warnings + ["llm_extractor_fallback_deterministic"] + det_warnings
+    raise ValueError(f"Unsupported top5 extractor: {extractor}")
+
+
 def _extract_gold_name_from_row(row: dict[str, Any]) -> str | None:
     candidates = [
         "golden_diagnosis_name",
@@ -837,7 +917,10 @@ def run_benchmark(
     dataset_file: str,
     official_eval: bool = False,
     allow_smoke: bool = False,
+    top5_extractor: str = "deterministic",
 ) -> Path:
+    if top5_extractor not in TOP5_EXTRACTORS:
+        raise ValueError(f"Unsupported top5_extractor: {top5_extractor}")
     cfg = get_config()
     _assert_official_benchmark_is_clean(mode, config=cfg, data_source=data_source, allow_smoke=allow_smoke)
     supported_modes = {
@@ -1105,20 +1188,31 @@ def run_benchmark(
                 fallback_topk, _, _, _, _ = _extract_prediction_candidates(raw_answer=raw_answer, top_k=5)
                 final_action_diagnoses = fallback_topk
 
-        if final_action_diagnoses:
+        if normalized_mode in OFFICIAL_BENCHMARK_MODES:
+            parsed_topk, parsed_norm, parse_status, parse_warn = _extract_official_top5(
+                raw_answer=raw_answer,
+                extractor=top5_extractor,
+                llm=llm,
+                caller_prefix=f"{normalized_mode}.{item.case_id}",
+            )
+            if parsed_topk:
+                prediction_topk = parsed_topk
+                normalized_prediction_topk = parsed_norm
+            elif final_action_diagnoses:
+                prediction_topk = final_action_diagnoses[:5]
+                normalized_prediction_topk = [_norm(x) for x in prediction_topk if _norm(x)]
+            else:
+                prediction_topk = []
+                normalized_prediction_topk = []
+            prediction_parse_status = parse_status
+            parser_warnings = parse_warn
+            raw_candidate_lines = [line.strip() for line in str(raw_answer).splitlines() if line.strip()][:20]
+        elif final_action_diagnoses:
             prediction_topk = final_action_diagnoses[:5]
             normalized_prediction_topk = [_norm(x) for x in prediction_topk if _norm(x)]
             parser_warnings = []
             prediction_parse_status = "ok"
             raw_candidate_lines = list(prediction_topk)
-            if normalized_mode in {"plain_llm_deeprare_official", "react_agent_without_tool_deeprare_official", "react_agent_with_tool_deeprare_official"}:
-                parsed_topk, parsed_norm, parse_status, parse_warn = _extract_deeprare_top5_from_text(raw_answer)
-                if parsed_topk:
-                    prediction_topk = parsed_topk
-                    normalized_prediction_topk = parsed_norm
-                prediction_parse_status = parse_status
-                parser_warnings = parse_warn
-                raw_candidate_lines = [line.strip() for line in str(raw_answer).splitlines() if line.strip()][:20]
         else:
             (
                 prediction_topk,
@@ -1227,6 +1321,7 @@ def run_benchmark(
     metrics["sample_order"] = sample_order
     metrics["seed"] = seed
     metrics["minimal_eval_is_smoke_only"] = True
+    metrics["top5_extractor"] = top5_extractor
     metrics["smoke_metrics"] = minimal_metrics if smoke_mode else {}
     metrics["official_metrics"] = official_metrics
     metrics["official_eval_disabled"] = smoke_mode
@@ -1678,6 +1773,7 @@ def main() -> None:
     parser.add_argument("--split", type=str, default="test")
     parser.add_argument("--official-eval", action="store_true")
     parser.add_argument("--allow-smoke", action="store_true")
+    parser.add_argument("--top5-extractor", type=str, default="deterministic", choices=["deterministic", "llm"])
     parser.add_argument("--check-parser", action="store_true")
     args = parser.parse_args()
     if args.check_parser:
@@ -1693,6 +1789,7 @@ def main() -> None:
         dataset_file=args.dataset_file,
         official_eval=args.official_eval,
         allow_smoke=args.allow_smoke,
+        top5_extractor=args.top5_extractor,
     )
 
 

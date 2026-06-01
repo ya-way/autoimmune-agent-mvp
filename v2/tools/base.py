@@ -14,25 +14,6 @@ class ToolResult:
     results: list[Any]
 
 
-def local_empty_database_search(query: str, logger: V2RunLogger, caller: str) -> dict[str, Any]:
-    start = perf_counter()
-    output = {
-        "status": "database EMPTY",
-        "query": query,
-        "results": [],
-    }
-    latency_ms = round((perf_counter() - start) * 1000, 2)
-    logger.log_tool_call(
-        "local_empty_database_search",
-        {"query": query, "caller": caller},
-        output,
-        latency_ms,
-        True,
-        "",
-    )
-    return output
-
-
 def normalize_answer(raw_answer: str, top_k: int = 5, logger: V2RunLogger | None = None) -> list[str]:
     start = perf_counter()
     lines = [line.strip() for line in raw_answer.splitlines() if line.strip()]

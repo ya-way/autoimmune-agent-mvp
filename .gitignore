@@ -1,5 +1,6 @@
 .env
 *.env
+secret.toml
 .venv/
 venv/
 __pycache__/
@@ -10,8 +11,15 @@ __pycache__/
 .DS_Store
 
 ## runtime logs and generated artifacts
-v2/logs/
-logs/
+v2/logs/*
+!v2/logs/showcase_final/
+v2/logs/showcase_final/*
+!v2/logs/showcase_final/SHOWCASE_INDEX.md
+!v2/logs/showcase_final/case1_autoimmune_evidence_convergence/
+!v2/logs/showcase_final/case1_autoimmune_evidence_convergence/**
+!v2/logs/showcase_final/case2_drug_safety_no_silent_default/
+!v2/logs/showcase_final/case2_drug_safety_no_silent_default/**
+/logs/
 *.log
 
 ## datasets and external repos

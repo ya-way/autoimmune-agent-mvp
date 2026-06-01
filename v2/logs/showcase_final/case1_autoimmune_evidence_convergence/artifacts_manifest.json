@@ -1,0 +1,15 @@
+{
+  "run_id": "20260601_192908_862657_ask",
+  "files": {
+    "summary": "summary.json",
+    "calls": "calls.jsonl",
+    "full_trace_json": "full_trace.json",
+    "full_trace_md": "full_trace.md",
+    "case_report": "case_report.md"
+  },
+  "deprecated_files": [
+    "trace.md"
+  ],
+  "mode": "ask",
+  "status": "success"
+}

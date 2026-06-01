@@ -241,9 +241,9 @@ def _write_connectivity_markdown(
     success_count: int,
     failed_count: int,
 ) -> None:
-    md_path = Path(__file__).resolve().parent / "logs" / "brave_connectivity_check.md"
+    md_path = Path(__file__).resolve().parent / "logs" / "web_connectivity_check.md"
     lines = [
-        "# Brave Connectivity Check",
+        "# Web Search Connectivity Check",
         "",
         f"- checked_at: `{datetime.now(UTC).isoformat().replace('+00:00', 'Z')}`",
         f"- query: `{query}`",
@@ -272,7 +272,11 @@ def _write_connectivity_markdown(
 
 def run_check_rarebench_local() -> None:
     cfg = get_config()
-    csv_path = cfg.rarebench_local_csv or "/home/shuotong/DeepRare/dataset/rarebench_local/rarebench_local_sample.csv"
+    csv_path = cfg.rarebench_local_csv.strip()
+    if not csv_path:
+        raise RuntimeError(
+            "RAREBENCH_LOCAL_CSV is not set. Please configure it in secret.toml or environment variables."
+        )
     fp = Path(csv_path).expanduser().resolve()
     if not fp.exists():
         raise FileNotFoundError(f"RareBench local CSV not found: {fp}")

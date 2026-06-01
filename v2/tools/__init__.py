@@ -1,6 +1,6 @@
 """Tool registry and exports."""
 
-from v2.tools.base import ToolResult, build_tool_registry, local_empty_database_search, normalize_answer
+from v2.tools.base import ToolResult, build_tool_registry, normalize_answer
 from v2.tools.drug import rxnorm_normalize_drug
 from v2.tools.literature import pubmed_search
 from v2.tools.pathway import opentargets_search, reactome_search
@@ -16,7 +16,6 @@ TOOLS = build_tool_registry(
     ("opentargets_search", opentargets_search),
     ("openfda_drug_event_search", openfda_drug_event_search),
     ("rxnorm_normalize_drug", rxnorm_normalize_drug),
-    ("local_empty_database_search", local_empty_database_search),
     ("normalize_answer", normalize_answer),
 )
 
@@ -30,6 +29,5 @@ __all__ = [
     "opentargets_search",
     "openfda_drug_event_search",
     "rxnorm_normalize_drug",
-    "local_empty_database_search",
     "normalize_answer",
 ]
